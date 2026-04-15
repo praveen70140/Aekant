@@ -77,6 +77,9 @@ jobs:
           sed -i 's|url: .*|url: ${{ github.event.inputs.download_url }}|' flatpak/org.aekant.Aekant.yml
           sed -i 's|sha256: .*|sha256: ${{ steps.checksum.outputs.sha256 }}|' flatpak/org.aekant.Aekant.yml
           
+      - name: Install Flatpak tools
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+        
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
