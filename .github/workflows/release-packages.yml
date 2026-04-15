@@ -1,0 +1,155 @@
+name: Release Multi-Format Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 2.0.1002)'
+        required: true
+        default: '2.0.1002'
+      download_url:
+        description: 'Direct download URL for the .tar.xz'
+        required: true
+        default: 'https://aekant.com//apps/aekant-2.0.1002.en-US.linux-x86_64.tar.xz'
+
+permissions:
+  contents: write
+
+jobs:
+  build-appimage:
+    name: Build AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2 desktop-file-utils
+      
+      - name: Download and extract tarball
+        run: |
+          wget "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          mkdir -p AppDir/usr/bin
+          tar -xf aekant.tar.xz -C AppDir/usr/bin/
+          
+      - name: Setup AppDir
+        run: |
+          cp appimage/AppRun AppDir/
+          chmod +x AppDir/AppRun
+          cp appimage/aekant.desktop AppDir/
+          cp AppDir/usr/bin/aekant/browser/chrome/icons/default/default128.png AppDir/aekant.png
+          
+      - name: Create executable symlink
+        run: |
+          # The AppRun script will handle the execution
+          ln -s AppRun AppDir/aekant
+          
+      - name: Download appimagetool
+        run: |
+          wget https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          
+      - name: Build AppImage
+        env:
+          ARCH: x86_64
+        run: |
+          ./appimagetool AppDir Aekant-${{ github.event.inputs.version }}-x86_64.AppImage
+          
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aekant-AppImage
+          path: Aekant-*.AppImage
+
+  build-flatpak:
+    name: Build Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-23.08
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Calculate Checksum
+        id: checksum
+        run: |
+          wget "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          echo "sha256=$(sha256sum aekant.tar.xz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          
+      - name: Update Manifest
+        run: |
+          sed -i 's|url: .*|url: ${{ github.event.inputs.download_url }}|' flatpak/org.aekant.Aekant.yml
+          sed -i 's|sha256: .*|sha256: ${{ steps.checksum.outputs.sha256 }}|' flatpak/org.aekant.Aekant.yml
+          
+      - name: Build Flatpak
+        run: |
+          flatpak-builder --repo=repo --force-clean build-dir flatpak/org.aekant.Aekant.yml
+          flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
+          
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aekant-Flatpak
+          path: Aekant.flatpak
+
+  build-aur:
+    name: Build AUR & Update PKGBUILD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Calculate Checksum
+        id: checksum
+        run: |
+          wget "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          echo "sha256=$(sha256sum aekant.tar.xz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          
+      - name: Update PKGBUILD
+        run: |
+          sed -i 's/pkgver=.*/pkgver=${{ github.event.inputs.version }}/' aur/PKGBUILD
+          sed -i "s/sha256sums=('0'/sha256sums=('${{ steps.checksum.outputs.sha256 }}'/" aur/PKGBUILD
+          
+      - name: Upload AUR Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aekant-AUR
+          path: aur/
+
+      - name: Push to AUR
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          git clone ssh://aur@aur.archlinux.org/aekant-browser-bin.git aur-repo
+          cp aur/PKGBUILD aur/aekant.desktop aur-repo/
+          cd aur-repo
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add PKGBUILD aekant.desktop
+          git commit -m "Update to version ${{ github.event.inputs.version }}"
+          git push
+
+  release:
+    name: Create Release
+    needs: [build-appimage, build-flatpak, build-aur]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Aekant Browser v${{ github.event.inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            Aekant-AppImage/*.AppImage
+            Aekant-Flatpak/*.flatpak
+            Aekant-AUR/PKGBUILD
+            Aekant-AUR/aekant.desktop
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,35 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=aekant-browser-bin
+_pkgname=aekant
+pkgver=2.0.1002
+pkgrel=1
+pkgdesc="Private, fast, and secure browser"
+arch=('x86_64')
+url="https://aekant.com/"
+license=('custom') # Update this if you know the license
+depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libxtst' 'libxcb' 'at-spi2-core' 'libcups' 'pango' 'cairo' 'libxkbcommon' 'mesa')
+provides=('aekant-browser')
+conflicts=('aekant-browser')
+source=("https://aekant.com//apps/aekant-${pkgver}.en-US.linux-x86_64.tar.xz"
+        "aekant.desktop")
+sha256sums=('0' # To be updated by CI/CD
+            'SKIP')
+
+package() {
+    cd "${srcdir}/${_pkgname}"
+
+    # Install to /opt
+    mkdir -p "${pkgdir}/opt/${_pkgname}"
+    cp -r * "${pkgdir}/opt/${_pkgname}/"
+
+    # Symlink to /usr/bin
+    mkdir -p "${pkgdir}/usr/bin"
+    ln -s "/opt/${_pkgname}/${_pkgname}" "${pkgdir}/usr/bin/${_pkgname}"
+
+    # Install desktop entry
+    install -Dm644 "${srcdir}/aekant.desktop" "${pkgdir}/usr/share/applications/aekant.desktop"
+
+    # Install icon
+    install -Dm644 "${srcdir}/${_pkgname}/browser/chrome/icons/default/default128.png" \
+        "${pkgdir}/usr/share/icons/hicolor/128x128/apps/aekant.png"
+}

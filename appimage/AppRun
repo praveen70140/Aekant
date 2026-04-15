@@ -1,0 +1,20 @@
+#!/bin/bash
+# AppRun for Aekant Browser
+set -e
+
+# Find our directory
+SELF=$(readlink -f "$0")
+HERE="${SELF%/*}"
+
+# Use bundled libraries if they exist
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
+export PATH="${HERE}/usr/bin:${PATH}"
+
+# Execute the browser
+if [ -f "${HERE}/usr/bin/aekant/aekant" ]; then
+    exec "${HERE}/usr/bin/aekant/aekant" "$@"
+elif [ -f "${HERE}/aekant/aekant" ]; then
+    exec "${HERE}/aekant/aekant" "$@"
+else
+    exec "${HERE}/aekant" "$@"
+fi
