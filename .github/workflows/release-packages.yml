@@ -81,7 +81,7 @@ jobs:
           
       - name: Build Flatpak
         run: |
-          flatpak-builder --repo=repo --force-clean build-dir flatpak/org.aekant.Aekant.yml
+          flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse build-dir flatpak/org.aekant.Aekant.yml
           flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
           
       - name: Upload Flatpak Artifact
