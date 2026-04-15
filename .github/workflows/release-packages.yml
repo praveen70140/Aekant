@@ -81,14 +81,12 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.freedesktop.Platform/x86_64/23.08 org.freedesktop.Sdk/x86_64/23.08
         
       - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: Aekant.flatpak
-          manifest-path: flatpak/org.aekant.Aekant.yml
-          cache: false
-          run-tests: false
+        run: |
+          flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse build-dir flatpak/org.aekant.Aekant.yml
+          flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
 
       - name: Upload Flatpak Artifact
         uses: actions/upload-artifact@v4
