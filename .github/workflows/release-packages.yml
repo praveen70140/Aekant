@@ -19,15 +19,15 @@ jobs:
   build-appimage:
     name: Build AppImage
     runs-on: ubuntu-latest
-    container:
-      image: appimagebuilder/appimage-builder:latest
-      options: --device /dev/fuse --privileged
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y fuse libfuse2 desktop-file-utils
+      
       - name: Download and extract tarball
         run: |
-          curl -L "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
           mkdir -p AppDir/usr/bin
           tar -xf aekant.tar.xz -C AppDir/usr/bin/
           
@@ -43,11 +43,16 @@ jobs:
           # The AppRun script will handle the execution
           ln -s AppRun AppDir/aekant
           
+      - name: Download appimagetool
+        run: |
+          curl -L https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+          chmod +x appimagetool
+          
       - name: Build AppImage
         env:
           ARCH: x86_64
         run: |
-          appimagetool AppDir Aekant-${{ github.event.inputs.version }}-x86_64.AppImage
+          ./appimagetool AppDir Aekant-${{ github.event.inputs.version }}-x86_64.AppImage
           
       - name: Upload AppImage Artifact
         uses: actions/upload-artifact@v4
@@ -66,7 +71,7 @@ jobs:
       - name: Calculate Checksum
         id: checksum
         run: |
-          curl -L "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
           echo "sha256=$(sha256sum aekant.tar.xz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           
       - name: Update Manifest
@@ -94,7 +99,7 @@ jobs:
       - name: Calculate Checksum
         id: checksum
         run: |
-          curl -L "${{ github.event.inputs.download_url }}" -O aekant.tar.xz
+          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
           echo "sha256=$(sha256sum aekant.tar.xz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           
       - name: Update PKGBUILD
