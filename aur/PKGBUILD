@@ -10,10 +10,24 @@ license=('custom') # Update this if you know the license
 depends=('gtk3' 'nss' 'alsa-lib' 'libxss' 'libxtst' 'libxcb' 'at-spi2-core' 'libcups' 'pango' 'cairo' 'libxkbcommon' 'mesa')
 provides=('aekant-browser')
 conflicts=('aekant-browser')
-source=("https://aekant.com//apps/aekant-${pkgver}.en-US.linux-x86_64.tar.xz"
-        "aekant.desktop")
-sha256sums=('0' # To be updated by CI/CD
-            'SKIP')
+source=("https://aekant.com//apps/aekant-${pkgver}.en-US.linux-x86_64.tar.xz")
+sha256sums=('0') # To be updated by CI/CD
+
+prepare() {
+    # Create desktop entry on the fly
+    cat <<EOF > aekant.desktop
+[Desktop Entry]
+Name=Aekant Browser
+Comment=Private, fast, and secure browser
+Exec=aekant %u
+Icon=aekant
+Terminal=false
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;
+StartupNotify=true
+EOF
+}
 
 package() {
     cd "${srcdir}/${_pkgname}"
