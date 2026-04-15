@@ -21,7 +21,7 @@ modules:
     buildsystem: simple
     build-commands:
       - mkdir -p /app/opt/aekant /app/bin /app/share/applications /app/share/icons/hicolor/128x128/apps
-      - cp -r aekant/* /app/opt/aekant/
+      - cp -r . /app/opt/aekant/
       - ln -s /app/opt/aekant/aekant /app/bin/aekant
       - cp /app/opt/aekant/browser/chrome/icons/default/default128.png /app/share/icons/hicolor/128x128/apps/org.aekant.Aekant.png
       - |
