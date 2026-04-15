@@ -63,8 +63,6 @@ jobs:
   build-flatpak:
     name: Build Flatpak
     runs-on: ubuntu-latest
-    container:
-      image: bilelmoussaoui/flatpak-github-actions:freedesktop-23.08
     steps:
       - uses: actions/checkout@v4
       
@@ -80,10 +78,13 @@ jobs:
           sed -i 's|sha256: .*|sha256: ${{ steps.checksum.outputs.sha256 }}|' flatpak/org.aekant.Aekant.yml
           
       - name: Build Flatpak
-        run: |
-          flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse build-dir flatpak/org.aekant.Aekant.yml
-          flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
-          
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Aekant.flatpak
+          manifest-path: flatpak/org.aekant.Aekant.yml
+          cache: false
+          run-tests: false
+
       - name: Upload Flatpak Artifact
         uses: actions/upload-artifact@v4
         with:
