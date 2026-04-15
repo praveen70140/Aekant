@@ -87,6 +87,23 @@ jobs:
         run: |
           flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse build-dir flatpak/org.aekant.Aekant.yml
           flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
+          
+      - name: Create .flatpakrepo file
+        run: |
+          cat <<EOF > aekant.flatpakrepo
+          [Flatpak Repo]
+          Title=Aekant Browser Repository
+          Url=https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/repo/
+          Homepage=https://aekant.com/
+          Icon=https://aekant.com/favicon.ico
+          Nodefault=true
+          EOF
+          
+      - name: Upload Repo Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aekant-Repo
+          path: repo/
 
       - name: Upload Flatpak Artifact
         uses: actions/upload-artifact@v4
@@ -136,10 +153,12 @@ jobs:
           git push
 
   release:
-    name: Create Release
+    name: Create Release & Deploy Repo
     needs: [build-appimage, build-flatpak, build-aur]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
         
@@ -157,3 +176,11 @@ jobs:
             Aekant-AUR/aekant.desktop
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy Flatpak Repo to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: Aekant-Repo
+          branch: gh-pages
+          target-folder: repo/
+          clean: false # Don't delete previous versions from the repo
