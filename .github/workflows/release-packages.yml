@@ -84,7 +84,7 @@ jobs:
           sudo flatpak install -y flathub org.freedesktop.Platform/x86_64/23.08 org.freedesktop.Sdk/x86_64/23.08
         
       - name: Import GPG Key
-        if: env.GPG_PRIVATE_KEY != ''
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
         id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
@@ -181,7 +181,7 @@ jobs:
           path: aur/
 
       - name: Push to AUR
-        if: env.AUR_SSH_PRIVATE_KEY != ''
+        if: ${{ secrets.AUR_SSH_PRIVATE_KEY != '' }}
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
         run: |
