@@ -85,36 +85,19 @@ jobs:
         
       - name: Import GPG Key
         if: env.GPG_PRIVATE_KEY != ''
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          echo "::group::GPG Import Debug"
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
-          
-          # Setup agent to allow loopback passphrase handling
-          echo "pinentry-mode loopback" > ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
-          
-          echo "Importing key..."
-          if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import
-          else
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
-          fi
-          
-          echo "List of imported keys:"
-          gpg --list-secret-keys --keyid-format LONG
-          echo "::endgroup::"
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
           
       - name: Build Flatpak
         run: |
           echo "::group::Flatpak Build & Sign Debug"
           GPG_ARG=""
-          if [ -n "${{ secrets.GPG_KEY_ID }}" ]; then
-            GPG_ARG="--gpg-sign=${{ secrets.GPG_KEY_ID }}"
-            echo "Signing with Key ID: ${{ secrets.GPG_KEY_ID }}"
+          if [ "${{ steps.import_gpg.outputs.keyid }}" != "" ]; then
+            GPG_ARG="--gpg-sign=${{ steps.import_gpg.outputs.keyid }}"
+            echo "Signing with Key ID: ${{ steps.import_gpg.outputs.keyid }}"
           fi
           
           # Build repo
@@ -122,12 +105,9 @@ jobs:
           
           # Explicitly update and sign the summary
           echo "Updating and signing summary..."
-          if [ -n "${{ secrets.GPG_KEY_ID }}" ]; then
-            if [ -n "${{ secrets.GPG_PASSPHRASE }}" ]; then
-              flatpak build-update-repo --gpg-sign=${{ secrets.GPG_KEY_ID }} --gpg-homedir=~/.gnupg repo/
-            else
-              flatpak build-update-repo --gpg-sign=${{ secrets.GPG_KEY_ID }} repo/
-            fi
+          if [ -n "${{ steps.import_gpg.outputs.keyid }}" ]; then
+            # We use the passphrase from the environment if it exists
+            echo "${{ secrets.GPG_PASSPHRASE }}" | flatpak build-update-repo --gpg-sign=${{ steps.import_gpg.outputs.keyid }} repo/
           else
             flatpak build-update-repo repo/
           fi
@@ -138,7 +118,10 @@ jobs:
           
           if [ -f repo/summary.sig ]; then
             echo "Checking summary signature validity..."
-            gpg --verify repo/summary.sig repo/summary || echo "SIGNATURE VERIFICATION FAILED!"
+            # Verify using the public key from our secrets to be sure
+            echo "${{ secrets.GPG_PUBLIC_KEY }}" | base64 -d > public.key
+            gpg --no-default-keyring --keyring ./temp_keyring.gpg --import public.key
+            gpg --no-default-keyring --keyring ./temp_keyring.gpg --verify repo/summary.sig repo/summary || echo "SIGNATURE VERIFICATION FAILED!"
           fi
           
           flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
