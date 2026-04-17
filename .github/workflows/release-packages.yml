@@ -95,26 +95,41 @@ jobs:
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           
-          # Setup agent configuration
+          # Clear any existing configuration to ensure a clean state
+          rm -f ~/.gnupg/gpg-agent.conf ~/.gnupg/gpg.conf
+          
+          # Setup agent configuration for non-interactive passphrase entry
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
-          echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
+          echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
+          echo "use-agent" >> ~/.gnupg/gpg.conf
+          echo "default-cache-ttl 3600" >> ~/.gnupg/gpg-agent.conf
+          echo "max-cache-ttl 3600" >> ~/.gnupg/gpg-agent.conf
           chmod 600 ~/.gnupg/gpg-agent.conf ~/.gnupg/gpg.conf
+          
+          gpg --version
           
           # Restart agent to apply config
           gpgconf --kill gpg-agent
           
           echo "Importing Keys..."
-          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          # Use a temporary file to avoid issues with large secrets and pipes
+          echo "$GPG_PRIVATE_KEY" | base64 -d > private.key
+          gpg --batch --yes --import private.key
+          rm private.key
+          
           if [ -n "${{ secrets.GPG_PUBLIC_KEY }}" ]; then
-            echo "${{ secrets.GPG_PUBLIC_KEY }}" | base64 -d | gpg --batch --import
+            echo "${{ secrets.GPG_PUBLIC_KEY }}" | base64 -d > public.key
+            gpg --batch --yes --import public.key
+            rm public.key
           fi
           
           # List keys for debugging
-          echo "Secret Keys:"
-          gpg --list-secret-keys --keyid-format LONG
+          echo "Secret Keys (Verbose):"
+          gpg --list-secret-keys --keyid-format LONG --with-colons
           
-          # Detect Fingerprint
-          FPR=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/ {print $10; exit}')
+          # Detect Fingerprint - try to find a signing key (master or subkey)
+          # We look for 'fpr' lines and pick the first one associated with a secret key
+          FPR=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')
           echo "Detected Fingerprint: $FPR"
           
           if [ -z "$FPR" ]; then
@@ -129,9 +144,13 @@ jobs:
           # "Warm up" the agent - this caches the key so flatpak-builder can use it
           echo "Performing warm-up signature..."
           if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null
+            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
+              echo "Warm-up signature FAILED with passphrase"
+              # Try without passphrase just in case the key doesn't have one
+              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || exit 1
+            }
           else
-            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null
+            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || exit 1
           fi
           
           echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
