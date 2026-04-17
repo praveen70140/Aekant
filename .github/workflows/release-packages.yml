@@ -83,9 +83,20 @@ jobs:
           sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           sudo flatpak install -y flathub org.freedesktop.Platform/x86_64/23.08 org.freedesktop.Sdk/x86_64/23.08
         
+      - name: Import GPG Key
+        if: env.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import
+          
       - name: Build Flatpak
         run: |
-          flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse build-dir flatpak/org.aekant.Aekant.yml
+          GPG_ARG=""
+          if [ -n "${{ secrets.GPG_KEY_ID }}" ]; then
+            GPG_ARG="--gpg-sign=${{ secrets.GPG_KEY_ID }}"
+          fi
+          flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse $GPG_ARG build-dir flatpak/org.aekant.Aekant.yml
           flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
           
       - name: Create .flatpakrepo file
@@ -98,6 +109,11 @@ jobs:
           Icon=https://aekant.com/favicon.ico
           Nodefault=true
           EOF
+          if [ -n "${{ secrets.GPG_PUBLIC_KEY }}" ]; then
+            echo "GPGKey=${{ secrets.GPG_PUBLIC_KEY }}" >> aekant.flatpakrepo
+          else
+            echo "GPGVerify=false" >> aekant.flatpakrepo
+          fi
           
       - name: Upload Repo Artifact
         uses: actions/upload-artifact@v4
