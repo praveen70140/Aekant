@@ -147,7 +147,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Aekant-Repo
-          path: repo/
+          path: |
+            repo/
+            aekant.flatpakrepo
 
       - name: Upload Flatpak Artifact
         uses: actions/upload-artifact@v4
@@ -226,5 +228,4 @@ jobs:
         with:
           folder: Aekant-Repo
           branch: gh-pages
-          target-folder: repo/
           clean: false # Don't delete previous versions from the repo
