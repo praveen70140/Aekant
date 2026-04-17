@@ -95,39 +95,39 @@ jobs:
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           
-          # Force GPG to use a dummy TTY
-          export GPG_TTY=$(tty)
-          
           # Setup agent
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
           echo "pinentry-mode loopback" >> ~/.gnupg/gpg.conf
           gpgconf --kill gpg-agent
           
-          echo "Importing Private Key..."
-          if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import
-          else
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
-          fi
-          
-          # Also import public key to ensure the keyring is complete
-          echo "Importing Public Key..."
+          echo "Importing Keys..."
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
           echo "${{ secrets.GPG_PUBLIC_KEY }}" | base64 -d | gpg --batch --import
           
-          echo "Key Status:"
-          gpg --list-secret-keys --keyid-format LONG
+          # Detect Key ID
+          KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | tail -n1)
+          echo "Detected Key ID: $KEY_ID"
+          
+          # "Warm up" the agent - this caches the key so flatpak-builder can use it
+          echo "Performing warm-up signature..."
+          if [ -n "$GPG_PASSPHRASE" ]; then
+            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign > /dev/null
+          else
+            echo "test" | gpg --batch --sign > /dev/null
+          fi
+          
+          echo "GPG_KEY_ID=$KEY_ID" >> $GITHUB_ENV
           echo "::endgroup::"
           
       - name: Build Flatpak
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "::group::Flatpak Build & Sign Debug"
-          # Find the Key ID automatically from the keyring
-          KEY_ID=$(gpg --list-secret-keys --with-colons | grep '^sec' | cut -d: -f5 | tail -n1)
-          
           GPG_ARG=""
-          if [ -n "$KEY_ID" ]; then
-            GPG_ARG="--gpg-sign=$KEY_ID"
-            echo "Signing with detected Key ID: $KEY_ID"
+          if [ -n "$GPG_KEY_ID" ]; then
+            GPG_ARG="--gpg-sign=$GPG_KEY_ID"
+            echo "Signing with Key ID: $GPG_KEY_ID"
           fi
           
           # Build repo
@@ -135,11 +135,11 @@ jobs:
           
           # Explicitly update and sign the summary
           echo "Updating and signing summary..."
-          if [ -n "$KEY_ID" ]; then
-            if [ -n "${{ secrets.GPG_PASSPHRASE }}" ]; then
-              echo "${{ secrets.GPG_PASSPHRASE }}" | flatpak build-update-repo --gpg-sign=$KEY_ID repo/
+          if [ -n "$GPG_KEY_ID" ]; then
+            if [ -n "$GPG_PASSPHRASE" ]; then
+               echo "$GPG_PASSPHRASE" | flatpak build-update-repo --gpg-sign=$GPG_KEY_ID repo/
             else
-              flatpak build-update-repo --gpg-sign=$KEY_ID repo/
+               flatpak build-update-repo --gpg-sign=$GPG_KEY_ID repo/
             fi
           else
             flatpak build-update-repo repo/
