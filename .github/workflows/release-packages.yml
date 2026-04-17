@@ -90,25 +90,14 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/.gnupg
-          echo "pinentry-mode loopback" > ~/.gnupg/gpg-agent.conf
-          gpgconf --kill gpg-agent
-          if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --import
-          else
-            echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
-          fi
+          chmod 700 ~/.gnupg
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
           
       - name: Build Flatpak
         run: |
           GPG_ARG=""
           if [ -n "${{ secrets.GPG_KEY_ID }}" ]; then
             GPG_ARG="--gpg-sign=${{ secrets.GPG_KEY_ID }}"
-          fi
-          # If a passphrase is provided, we need to pass it to flatpak-builder via an environment variable or wrapper
-          if [ -n "${{ secrets.GPG_PASSPHRASE }}" ]; then
-            export GPG_TTY=$(tty)
-            echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --no-tty --sign --detach-sign /dev/null
-            # flatpak-builder doesn't have a direct --passphrase flag, so we rely on the agent having the key cached or use a wrapper
           fi
           flatpak-builder --repo=repo --force-clean --disable-rofiles-fuse $GPG_ARG build-dir flatpak/org.aekant.Aekant.yml
           flatpak build-bundle repo Aekant.flatpak org.aekant.Aekant
