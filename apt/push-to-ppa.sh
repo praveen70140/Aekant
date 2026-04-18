@@ -15,10 +15,31 @@ if [ -z "$VERSION" ] || [ -z "$LP_USER" ] || [ -z "$PPA_NAME" ]; then
 fi
 
 # Distributions to target
-DISTS=("jammy" "noble" "focal")
+DISTS=("focal" "jammy" "noble")
+PROJECT_ROOT=$(pwd)
 
-# Create dput config
-cat <<EOF > ~/.dput.cf
+# Create a clean work directory
+WORK_DIR=$(mktemp -d)
+echo "Working in $WORK_DIR"
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+# 1. Prepare the common .orig.tar.xz
+# Launchpad requires an .orig.tar.xz that contains the upstream source.
+# For this binary package, we'll create one that matches the expected structure.
+SOURCE_DIR_NAME="aekant-browser-$VERSION"
+mkdir -p "$WORK_DIR/$SOURCE_DIR_NAME"
+
+# Try to extract with strip-components=1, but fall back if it fails (i.e. if no top-level dir)
+if ! tar -xf "$PROJECT_ROOT/aekant.tar.xz" -C "$WORK_DIR/$SOURCE_DIR_NAME" --strip-components=1 2>/dev/null; then
+    tar -xf "$PROJECT_ROOT/aekant.tar.xz" -C "$WORK_DIR/$SOURCE_DIR_NAME"
+fi
+
+# Create the .orig.tar.xz in the parent of where we will build
+cd "$WORK_DIR"
+tar -cJf "aekant-browser_$VERSION.orig.tar.xz" "$SOURCE_DIR_NAME"
+
+# 2. Setup dput config
+cat <<EOF > "$WORK_DIR/dput.cf"
 [aekant-ppa]
 fqdn = ppa.launchpad.net
 method = ftp
@@ -27,68 +48,55 @@ login = anonymous
 allow_unsigned_uploads = 0
 EOF
 
+# 3. GPG Wrapper for debsign if passphrase is provided
+if [ -n "$GPG_PASSPHRASE" ]; then
+    GPG_WRAPPER="$WORK_DIR/gpg-wrapper"
+    cat <<EOF > "$GPG_WRAPPER"
+#!/bin/bash
+printf "%s" "$GPG_PASSPHRASE" | exec gpg --batch --pinentry-mode loopback --passphrase-fd 0 "\$@"
+EOF
+    chmod +x "$GPG_WRAPPER"
+    export DEBSIGN_PROGRAM="$GPG_WRAPPER"
+fi
+
+# 4. Loop through distributions and build source packages
 DATE=$(date -R)
 
 for DIST in "${DISTS[@]}"; do
-    echo "Preparing upload for $DIST..."
+    echo "--------------------------------------------------------"
+    echo "Processing for $DIST..."
     
-    # Version for PPA must be unique per distribution
     PPA_VERSION="${VERSION}-0ppa1~ubuntu${DIST}"
+    DIST_DIR="$WORK_DIR/aekant-browser-$DIST"
     
-    # Clean up any previous builds
-    BUILD_ROOT="/tmp/aekant-build-$DIST"
-    rm -rf "$BUILD_ROOT"
-    mkdir -p "$BUILD_ROOT"
+    # Copy the prepared source tree
+    cp -r "$WORK_DIR/$SOURCE_DIR_NAME" "$DIST_DIR"
+    cp -r "$PROJECT_ROOT/apt/debian" "$DIST_DIR/debian"
     
-    # Copy source files to build root
-    cp -r . "$BUILD_ROOT/"
-    # Remove the tarball from build root so dpkg-source doesn't try to include it
-    rm -f "$BUILD_ROOT/aekant.tar.xz"
-    
-    # Provide the original tarball for dpkg-source (required for non-native packages)
-    cp aekant.tar.xz "/tmp/aekant-browser_${VERSION}.orig.tar.xz"
-    
-    cd "$BUILD_ROOT"
-    
-    # Move debian folder to root of source
-    cp -r apt/debian .
-    
-    # Update changelog
+    # Update changelog for this distribution
+    cd "$DIST_DIR"
     sed -i "s/#VERSION#/$PPA_VERSION/g" debian/changelog
     sed -i "s/#DIST#/$DIST/g" debian/changelog
     sed -i "s/#DATE#/$DATE/g" debian/changelog
     
-    # Create source package
-    # -us -uc means unsigned for now, we will sign with debsign
-    # -S means source package only
-    # -d means skip build dependencies check (useful in CI)
+    # Build source package (-S)
+    # -d skips build-deps check (useful for binary-only packaging in CI)
+    # -us -uc skips signing at this stage (we use debsign later)
     dpkg-buildpackage -S -d -us -uc
     
-    cd ..
-    
-    # Sign the changes and dsc files
+    # Sign and Upload
+    cd "$WORK_DIR"
     CHANGES_FILE="aekant-browser_${PPA_VERSION}_source.changes"
+    
     if [ -n "$GPG_KEY_ID" ]; then
         echo "Signing $CHANGES_FILE..."
-        
-        # Create a temporary GPG wrapper to handle the passphrase
-        WRAPPER_PATH=$(mktemp)
-        cat <<EOF > "$WRAPPER_PATH"
-#!/bin/bash
-printf "%s" "$GPG_PASSPHRASE" | exec gpg --batch --pinentry-mode loopback --passphrase-fd 0 "\$@"
-EOF
-        chmod +x "$WRAPPER_PATH"
-        export DEBSIGN_PROGRAM="$WRAPPER_PATH"
-        
         debsign -k "$GPG_KEY_ID" "$CHANGES_FILE"
-        rm "$WRAPPER_PATH"
         
-        # Upload to Launchpad
-        echo "Uploading to Launchpad..."
-        dput aekant-ppa "$CHANGES_FILE"
+        echo "Uploading to Launchpad ($DIST)..."
+        dput -c "$WORK_DIR/dput.cf" aekant-ppa "$CHANGES_FILE"
     else
-        echo "GPG_KEY_ID not provided, skipping signing and upload."
+        echo "No GPG_KEY_ID provided, skipping upload for $DIST."
     fi
 done
 
-echo "Done."
+echo "All done!"

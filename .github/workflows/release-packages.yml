@@ -281,16 +281,13 @@ jobs:
         if: env.HAS_LP_KEY == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y dpkg-dev devscripts dput gnupg curl debhelper
+          sudo apt-get install -y dpkg-dev devscripts dput gnupg curl debhelper fakeroot
       
-      - name: Download and prepare binary source
+      - name: Download binary source
         if: env.HAS_LP_KEY == 'true'
         run: |
-          # We download the binary tarball and treat it as the "source" for Launchpad
+          # We download the binary tarball as it is used by push-to-ppa.sh
           curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
-          # Extract everything to current directory
-          tar -xf aekant.tar.xz --strip-components=1
-          # Do NOT remove aekant.tar.xz as it is needed by push-to-ppa.sh
           
       - name: Import GPG Key
         if: env.HAS_LP_KEY == 'true'

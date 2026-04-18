@@ -15,10 +15,8 @@ override_dh_auto_install:
 	mkdir -p debian/aekant-browser/usr/share/applications
 	mkdir -p debian/aekant-browser/usr/share/icons/hicolor/128x128/apps
 
-	# Copy application files
-	cp -r * debian/aekant-browser/opt/aekant/
-	# Remove the debian directory from /opt/aekant if it exists
-	rm -rf debian/aekant-browser/opt/aekant/debian
+	# Copy application files (excluding the debian directory)
+	find . -maxdepth 1 -not -name 'debian' -not -name '.' -exec cp -r {} debian/aekant-browser/opt/aekant/ \;
 
 	# Create symlink
 	ln -s /opt/aekant/aekant debian/aekant-browser/usr/bin/aekant
