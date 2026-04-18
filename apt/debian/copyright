@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: aekant-browser
+Source: https://aekant.com/
+
+Files: *
+Copyright: 2024 Aekant Team <info@aekant.com>
+License: Proprietary
+ All rights reserved.

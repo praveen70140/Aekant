@@ -1,0 +1,35 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# No build needed for binary distribution
+
+override_dh_auto_install:
+	# Create directories
+	mkdir -p debian/aekant-browser/opt/aekant
+	mkdir -p debian/aekant-browser/usr/bin
+	mkdir -p debian/aekant-browser/usr/share/applications
+	mkdir -p debian/aekant-browser/usr/share/icons/hicolor/128x128/apps
+
+	# Copy application files
+	cp -r * debian/aekant-browser/opt/aekant/
+	# Remove the debian directory from /opt/aekant if it exists
+	rm -rf debian/aekant-browser/opt/aekant/debian
+
+	# Create symlink
+	ln -s /opt/aekant/aekant debian/aekant-browser/usr/bin/aekant
+
+	# Install desktop file and icon
+	cp debian/aekant.desktop debian/aekant-browser/usr/share/applications/
+	# Note: The icon path might change based on where the tarball extracts
+	if [ -f browser/chrome/icons/default/default128.png ]; then \
+		cp browser/chrome/icons/default/default128.png debian/aekant-browser/usr/share/icons/hicolor/128x128/apps/aekant.png; \
+	fi
+
+override_dh_shlibdeps:
+	# Ignore missing info for binary-only packages
+	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info

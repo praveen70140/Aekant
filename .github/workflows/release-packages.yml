@@ -264,15 +264,60 @@ jobs:
           git commit -m "Update to version ${{ github.event.inputs.version }}"
           git push
 
+  push-to-ppa:
+    name: Push to Launchpad PPA
+    runs-on: ubuntu-latest
+    if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev devscripts dput gnupg curl
+      
+      - name: Download and prepare binary source
+        run: |
+          # We download the binary tarball and treat it as the "source" for Launchpad
+          # This is a common pattern for binary redistribution on PPAs
+          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
+          # Extract everything to current directory so it's included in the source package
+          tar -xf aekant.tar.xz --strip-components=1
+          rm aekant.tar.xz
+          
+      - name: Import GPG Key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --yes --import
+          FPR=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')
+          echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
+
+      - name: Push to Launchpad
+        env:
+          LP_USER: ${{ secrets.LAUNCHPAD_USER }}
+          PPA_NAME: ${{ secrets.PPA_NAME }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          ./apt/push-to-ppa.sh "${{ github.event.inputs.version }}" "$LP_USER" "$PPA_NAME" "$GPG_KEY_ID" "$GPG_PASSPHRASE"
+
   release:
     name: Create Release & Deploy Repo
-    needs: [build-appimage, build-flatpak, build-aur]
+    needs: [build-appimage, build-flatpak, build-aur, push-to-ppa]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
+        continue-on-error: true
         
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -294,4 +339,4 @@ jobs:
         with:
           folder: Aekant-Repo
           branch: gh-pages
-          clean: false # Don't delete previous versions from the repo
+          clean: false
