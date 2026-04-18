@@ -89,7 +89,7 @@ jobs:
         if: env.GPG_PRIVATE_KEY != ''
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE || secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "::group::GPG Manual Import"
           mkdir -p ~/.gnupg
@@ -163,7 +163,7 @@ jobs:
           
       - name: Build Flatpak
         env:
-          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE || secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "::group::Flatpak Build & Sign Debug"
           GPG_ARG=""
@@ -296,7 +296,7 @@ jobs:
         if: env.HAS_LP_KEY == 'true'
         env:
           GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE || secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
@@ -344,7 +344,7 @@ jobs:
         env:
           LP_USER: ${{ secrets.LAUNCHPAD_USER }}
           PPA_NAME: ${{ secrets.PPA_NAME }}
-          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE || secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
         run: |
           ./apt/push-to-ppa.sh "${{ github.event.inputs.version }}" "$LP_USER" "$PPA_NAME" "$GPG_KEY_ID" "$GPG_PASSPHRASE"
 
