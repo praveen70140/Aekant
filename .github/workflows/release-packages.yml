@@ -293,17 +293,26 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "::error::GPG_PASSPHRASE is empty!"
+            exit 1
+          fi
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
           echo "pinentry-mode loopback" > ~/.gnupg/gpg.conf
           echo "use-agent" >> ~/.gnupg/gpg.conf
           gpgconf --kill gpg-agent
+          
           echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --yes --import
           FPR=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')
           echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
-          # Warm up the agent
-          echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null
+          
+          # Warm up the agent using the passphrase
+          echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
+            echo "::error::GPG Warm-up failed! Check your passphrase."
+            exit 1
+          }
 
       - name: Push to Launchpad
         if: env.HAS_LP_KEY == 'true'

@@ -65,13 +65,17 @@ for DIST in "${DISTS[@]}"; do
     if [ -n "$GPG_KEY_ID" ]; then
         echo "Signing $CHANGES_FILE..."
         
-        # We've warmed up the agent, but debsign might still struggle.
-        # Let's use gpg directly for signing if possible or configure debsign strictly.
-        # debsign -k will use gpg, which will use the agent since we've warmed it up.
-        # We just need to make sure gpg doesn't try to open a TTY.
-        export DEBSIGN_PROGRAM="gpg --batch --pinentry-mode loopback"
+        # Create a temporary GPG wrapper to handle the passphrase
+        WRAPPER_PATH=$(mktemp)
+        cat <<EOF > "$WRAPPER_PATH"
+#!/bin/bash
+exec gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" "\$@"
+EOF
+        chmod +x "$WRAPPER_PATH"
+        export DEBSIGN_PROGRAM="$WRAPPER_PATH"
         
         debsign -k "$GPG_KEY_ID" "$CHANGES_FILE"
+        rm "$WRAPPER_PATH"
         
         # Upload to Launchpad
         echo "Uploading to Launchpad..."
