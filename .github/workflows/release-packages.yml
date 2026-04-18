@@ -267,16 +267,17 @@ jobs:
   push-to-ppa:
     name: Push to Launchpad PPA
     runs-on: ubuntu-latest
-    if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
     steps:
       - uses: actions/checkout@v4
       
       - name: Install build tools
+        if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev devscripts dput gnupg curl
       
       - name: Download and prepare binary source
+        if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
         run: |
           # We download the binary tarball and treat it as the "source" for Launchpad
           # This is a common pattern for binary redistribution on PPAs
@@ -286,6 +287,7 @@ jobs:
           rm aekant.tar.xz
           
       - name: Import GPG Key
+        if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
         env:
           GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -300,6 +302,7 @@ jobs:
           echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
 
       - name: Push to Launchpad
+        if: secrets.LAUNCHPAD_GPG_PRIVATE_KEY != ''
         env:
           LP_USER: ${{ secrets.LAUNCHPAD_USER }}
           PPA_NAME: ${{ secrets.PPA_NAME }}
