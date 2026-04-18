@@ -69,7 +69,7 @@ for DIST in "${DISTS[@]}"; do
         WRAPPER_PATH=$(mktemp)
         cat <<EOF > "$WRAPPER_PATH"
 #!/bin/bash
-exec gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" "\$@"
+printf "%s" "$GPG_PASSPHRASE" | exec gpg --batch --pinentry-mode loopback --passphrase-fd 0 "\$@"
 EOF
         chmod +x "$WRAPPER_PATH"
         export DEBSIGN_PROGRAM="$WRAPPER_PATH"

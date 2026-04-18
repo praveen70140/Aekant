@@ -144,13 +144,18 @@ jobs:
           # "Warm up" the agent - this caches the key so flatpak-builder can use it
           echo "Performing warm-up signature..."
           if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
-              echo "Warm-up signature FAILED with passphrase"
-              # Try without passphrase just in case the key doesn't have one
-              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || exit 1
+            printf "%s" "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --sign --default-key "$FPR" > /dev/null 2>&1 || {
+              echo "Warm-up signature FAILED with passphrase. Trying without..."
+              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null 2>&1 || {
+                echo "::error::GPG Warm-up failed! The passphrase may be incorrect or the key is not usable."
+                exit 1
+              }
             }
           else
-            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || exit 1
+            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null 2>&1 || {
+              echo "::error::GPG Warm-up failed! No passphrase provided and key requires one."
+              exit 1
+            }
           fi
           
           echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
@@ -320,17 +325,17 @@ jobs:
           # Warm up the agent using the passphrase
           echo "Performing warm-up signature..."
           if [ -n "$GPG_PASSPHRASE" ]; then
-            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
-              echo "Warm-up signature FAILED with passphrase, trying without..."
-              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || {
-                echo "::error::GPG Warm-up failed! Check your passphrase."
+            printf "%s" "$GPG_PASSPHRASE" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --sign --default-key "$FPR" > /dev/null 2>&1 || {
+              echo "Warm-up signature FAILED with passphrase. Trying without..."
+              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null 2>&1 || {
+                echo "::error::GPG Warm-up failed! The passphrase may be incorrect or the key is not usable."
                 exit 1
               }
             }
           else
-            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || {
-               echo "::error::GPG Warm-up failed! No passphrase provided and key seems to require one."
-               exit 1
+            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null 2>&1 || {
+              echo "::error::GPG Warm-up failed! No passphrase provided and key requires one."
+              exit 1
             }
           fi
 
