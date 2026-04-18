@@ -290,7 +290,7 @@ jobs:
           curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
           # Extract everything to current directory
           tar -xf aekant.tar.xz --strip-components=1
-          rm aekant.tar.xz
+          # Do NOT remove aekant.tar.xz as it is needed by push-to-ppa.sh
           
       - name: Import GPG Key
         if: env.HAS_LP_KEY == 'true'
