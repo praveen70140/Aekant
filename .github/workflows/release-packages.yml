@@ -72,7 +72,7 @@ jobs:
         id: checksum
         run: |
           curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
-          echo "sha256=$(sha256sum aekant.tar.xz | cut -d' '1)" >> $GITHUB_OUTPUT
+          echo "sha256=$(sha256sum aekant.tar.xz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
           
       - name: Update Manifest
         run: |
@@ -293,10 +293,6 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          if [ -z "$GPG_PASSPHRASE" ]; then
-            echo "::error::GPG_PASSPHRASE is empty!"
-            exit 1
-          fi
           mkdir -p ~/.gnupg
           chmod 700 ~/.gnupg
           echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
@@ -304,15 +300,39 @@ jobs:
           echo "use-agent" >> ~/.gnupg/gpg.conf
           gpgconf --kill gpg-agent
           
-          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --yes --import
+          echo "$GPG_PRIVATE_KEY" | base64 -d > lp_private.key
+          gpg --batch --yes --import lp_private.key
+          rm lp_private.key
+          
           FPR=$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" {print $10; exit}')
+          echo "Detected Key: $FPR"
+          
+          if [ -z "$FPR" ]; then
+            echo "::error::No GPG key fingerprint detected!"
+            exit 1
+          fi
+          
+          # Trust the key ultimately
+          echo "$FPR:6:" | gpg --batch --import-ownertrust
+          
           echo "GPG_KEY_ID=$FPR" >> $GITHUB_ENV
           
           # Warm up the agent using the passphrase
-          echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
-            echo "::error::GPG Warm-up failed! Check your passphrase."
-            exit 1
-          }
+          echo "Performing warm-up signature..."
+          if [ -n "$GPG_PASSPHRASE" ]; then
+            echo "test" | gpg --batch --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --sign --default-key "$FPR" > /dev/null || {
+              echo "Warm-up signature FAILED with passphrase, trying without..."
+              echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || {
+                echo "::error::GPG Warm-up failed! Check your passphrase."
+                exit 1
+              }
+            }
+          else
+            echo "test" | gpg --batch --sign --default-key "$FPR" > /dev/null || {
+               echo "::error::GPG Warm-up failed! No passphrase provided and key seems to require one."
+               exit 1
+            }
+          fi
 
       - name: Push to Launchpad
         if: env.HAS_LP_KEY == 'true'
