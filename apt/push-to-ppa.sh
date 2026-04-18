@@ -36,12 +36,13 @@ for DIST in "${DISTS[@]}"; do
     PPA_VERSION="${VERSION}-0ppa1~ubuntu${DIST}"
     
     # Clean up any previous builds
-    rm -rf build-source
-    mkdir -p build-source
+    BUILD_ROOT="/tmp/aekant-build-$DIST"
+    rm -rf "$BUILD_ROOT"
+    mkdir -p "$BUILD_ROOT"
     
-    # Copy source files (excluding current build artifacts)
-    cp -r . build-source/
-    cd build-source
+    # Copy source files to build root
+    cp -r . "$BUILD_ROOT/"
+    cd "$BUILD_ROOT"
     
     # Move debian folder to root of source
     cp -r apt/debian .
