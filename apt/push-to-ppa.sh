@@ -42,6 +42,10 @@ for DIST in "${DISTS[@]}"; do
     
     # Copy source files to build root
     cp -r . "$BUILD_ROOT/"
+    
+    # Provide the original tarball for dpkg-source (required for non-native packages)
+    cp aekant.tar.xz "/tmp/aekant-browser_${VERSION}.orig.tar.xz"
+    
     cd "$BUILD_ROOT"
     
     # Move debian folder to root of source
