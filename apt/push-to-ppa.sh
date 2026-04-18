@@ -65,10 +65,11 @@ for DIST in "${DISTS[@]}"; do
     if [ -n "$GPG_KEY_ID" ]; then
         echo "Signing $CHANGES_FILE..."
         
-        # Configure debsign to use gpg with passphrase
-        if [ -n "$GPG_PASSPHRASE" ]; then
-            export DEBSIGN_PROGRAM="gpg --batch --passphrase $GPG_PASSPHRASE --pinentry-mode loopback"
-        fi
+        # We've warmed up the agent, but debsign might still struggle.
+        # Let's use gpg directly for signing if possible or configure debsign strictly.
+        # debsign -k will use gpg, which will use the agent since we've warmed it up.
+        # We just need to make sure gpg doesn't try to open a TTY.
+        export DEBSIGN_PROGRAM="gpg --batch --pinentry-mode loopback"
         
         debsign -k "$GPG_KEY_ID" "$CHANGES_FILE"
         
