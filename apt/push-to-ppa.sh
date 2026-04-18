@@ -42,6 +42,8 @@ for DIST in "${DISTS[@]}"; do
     
     # Copy source files to build root
     cp -r . "$BUILD_ROOT/"
+    # Remove the tarball from build root so dpkg-source doesn't try to include it
+    rm -f "$BUILD_ROOT/aekant.tar.xz"
     
     # Provide the original tarball for dpkg-source (required for non-native packages)
     cp aekant.tar.xz "/tmp/aekant-browser_${VERSION}.orig.tar.xz"
