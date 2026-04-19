@@ -2,7 +2,26 @@ Source: aekant-browser
 Section: web
 Priority: optional
 Maintainer: Aekant Team <info@aekant.com>
-Build-Depends: debhelper-compat (= 13)
+Build-Depends: debhelper-compat (= 13),
+               libgtk-3-dev,
+               libasound2-dev,
+               libx11-dev,
+               libxcomposite-dev,
+               libxdamage-dev,
+               libxext-dev,
+               libxfixes-dev,
+               libxrandr-dev,
+               libxrender-dev,
+               libxcursor-dev,
+               libxi-dev,
+               libxtst-dev,
+               libnss3-dev,
+               libcups2-dev,
+               libdbus-1-dev,
+               libglib2.0-dev,
+               libpango1.0-dev,
+               libfontconfig1-dev,
+               libfreetype6-dev
 Standards-Version: 4.5.0
 
 Package: aekant-browser

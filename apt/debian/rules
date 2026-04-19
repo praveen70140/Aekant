@@ -29,5 +29,5 @@ override_dh_auto_install:
 	fi
 
 override_dh_shlibdeps:
-	# Ignore missing info for binary-only packages
-	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info
+	# Tell dh_shlibdeps to look in our opt directory for its own libraries
+	dh_shlibdeps -l"debian/aekant-browser/opt/aekant" --dpkg-shlibdeps-params=--ignore-missing-info

@@ -92,8 +92,18 @@ for DIST in "${DISTS[@]}"; do
         echo "Signing $CHANGES_FILE..."
         debsign -k "$GPG_KEY_ID" "$CHANGES_FILE"
         
+        # Verify the signature actually exists and is valid
+        echo "Verifying signature..."
+        if gpg --verify "$CHANGES_FILE" 2>/dev/null; then
+            echo "Signature verified successfully."
+        else
+            echo "ERROR: Signature verification failed for $CHANGES_FILE!"
+            exit 1
+        fi
+        
         echo "Uploading to Launchpad ($DIST)..."
-        dput -c "$WORK_DIR/dput.cf" aekant-ppa "$CHANGES_FILE"
+        # Using -v for verbose output to see exactly what dput is doing
+        dput -v -c "$WORK_DIR/dput.cf" aekant-ppa "$CHANGES_FILE"
     else
         echo "No GPG_KEY_ID provided, skipping upload for $DIST."
     fi
