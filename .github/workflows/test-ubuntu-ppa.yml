@@ -7,6 +7,10 @@ on:
         description: 'Version to test (e.g., 2.0.1007)'
         required: true
         default: '2.0.1007'
+      download_url:
+        description: 'Direct download URL for the .tar.xz'
+        required: true
+        default: 'https://aekant.com//apps/aekant-2.0.1007.en-US.linux-x86_64.tar.xz'
 
 jobs:
   test-build:
@@ -29,17 +33,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y devscripts debhelper equivs dpkg-dev
 
-      - name: Download or Create aekant.tar.xz
+      - name: Download aekant.tar.xz
         run: |
-          # If your real build process downloads or creates `aekant.tar.xz` before pushing,
-          # you should replicate that here!
-          # For now, we create a dummy one if it doesn't exist so the tar extraction 
-          # doesn't fail and we can test `debian/control` and `debian/rules`.
-          if [ ! -f "aekant.tar.xz" ]; then
-            echo "Creating dummy aekant.tar.xz for testing..."
-            mkdir -p dummy_dir/aekant
-            tar -cJf aekant.tar.xz -C dummy_dir .
-          fi
+          echo "Downloading real source tarball..."
+          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
 
       - name: Prepare Source Directory
         run: |
