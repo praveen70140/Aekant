@@ -1,0 +1,85 @@
+name: Test Ubuntu PPA Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 2.0.1007)'
+        required: true
+        default: '2.0.1007'
+
+jobs:
+  test-build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-20.04 = Focal
+        # ubuntu-22.04 = Jammy
+        # ubuntu-24.04 = Noble
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Packaging Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts debhelper equivs dpkg-dev
+
+      - name: Download or Create aekant.tar.xz
+        run: |
+          # If your real build process downloads or creates `aekant.tar.xz` before pushing,
+          # you should replicate that here!
+          # For now, we create a dummy one if it doesn't exist so the tar extraction 
+          # doesn't fail and we can test `debian/control` and `debian/rules`.
+          if [ ! -f "aekant.tar.xz" ]; then
+            echo "Creating dummy aekant.tar.xz for testing..."
+            mkdir -p dummy_dir/aekant
+            tar -cJf aekant.tar.xz -C dummy_dir .
+          fi
+
+      - name: Prepare Source Directory
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          SOURCE_DIR="aekant-browser-$VERSION"
+          mkdir -p "$SOURCE_DIR"
+          
+          # Extract exactly like push-to-ppa.sh does
+          if ! tar -xf aekant.tar.xz -C "$SOURCE_DIR" --strip-components=1 2>/dev/null; then
+              tar -xf aekant.tar.xz -C "$SOURCE_DIR"
+          fi
+          
+          # Copy debian directory
+          cp -r apt/debian "$SOURCE_DIR/debian"
+          
+          # Update changelog
+          cd "$SOURCE_DIR"
+          sed -i "s/#VERSION#/${VERSION}-0ppa1~ubuntuTest/g" debian/changelog
+          sed -i "s/#DIST#/test/g" debian/changelog
+          sed -i "s/#DATE#/$(date -R)/g" debian/changelog
+
+      - name: Install Build Dependencies
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          cd "aekant-browser-$VERSION"
+          
+          # This step acts like the Launchpad buildd setup phase.
+          # If a dependency is missing or incompatible (like debhelper-compat=13 in Focal),
+          # the workflow will fail right here, saving you a Launchpad upload!
+          sudo mk-build-deps -i -r -t "apt-get --yes --no-install-recommends" debian/control
+
+      - name: Test Binary Build
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          cd "aekant-browser-$VERSION"
+          
+          # -us -uc skips GPG signing
+          # -b runs the binary build (simulates the Launchpad build farm compilation)
+          dpkg-buildpackage -us -uc -b
+          
+      - name: List Generated Debs
+        run: |
+          ls -lh *.deb || echo "No .deb files found"
