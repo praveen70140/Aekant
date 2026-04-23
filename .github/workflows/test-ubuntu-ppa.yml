@@ -35,8 +35,15 @@ jobs:
 
       - name: Download aekant.tar.xz
         run: |
-          echo "Downloading real source tarball..."
-          curl -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz
+          echo "Downloading real source tarball from ${{ github.event.inputs.download_url }}..."
+          # Added -f so curl fails immediately if it gets a 404 Not Found
+          curl -f -L "${{ github.event.inputs.download_url }}" -o aekant.tar.xz || {
+            echo "Failed to download! The file might not exist at that URL yet."
+            exit 1
+          }
+          
+          # Verify it's actually an xz archive
+          file aekant.tar.xz
 
       - name: Prepare Source Directory
         run: |
