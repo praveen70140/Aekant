@@ -102,8 +102,7 @@ for DIST in "${DISTS[@]}"; do
         fi
         
         echo "Uploading to Launchpad ($DIST)..."
-        # Using -v for verbose output to see exactly what dput is doing
-        dput -v -c "$WORK_DIR/dput.cf" aekant-ppa "$CHANGES_FILE"
+        dput -c "$WORK_DIR/dput.cf" aekant-ppa "$CHANGES_FILE"
     else
         echo "No GPG_KEY_ID provided, skipping upload for $DIST."
     fi
